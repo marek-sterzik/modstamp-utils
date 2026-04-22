@@ -59,12 +59,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/marek-sterzik/libmodstamp.git",
-                "reference": "34e2544c8ad90b07776ff76b453e1499df8740ca"
+                "reference": "935a07fc60a5060d47f9f64141bccc99d24221d4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/marek-sterzik/libmodstamp/zipball/34e2544c8ad90b07776ff76b453e1499df8740ca",
-                "reference": "34e2544c8ad90b07776ff76b453e1499df8740ca",
+                "url": "https://api.github.com/repos/marek-sterzik/libmodstamp/zipball/935a07fc60a5060d47f9f64141bccc99d24221d4",
+                "reference": "935a07fc60a5060d47f9f64141bccc99d24221d4",
                 "shasum": ""
             },
             "require": {
@@ -95,7 +95,7 @@
                 "issues": "https://github.com/marek-sterzik/libmodstamp/issues",
                 "source": "https://github.com/marek-sterzik/libmodstamp/tree/master"
             },
-            "time": "2026-04-21T22:25:49+00:00"
+            "time": "2026-04-22T17:47:47+00:00"
         }
     ],
     "packages-dev": [],

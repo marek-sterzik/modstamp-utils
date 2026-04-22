@@ -3,4 +3,183 @@
 
 require_once dirname(__DIR__) . "/vendor/autoload.php";
 
-echo "modstamp server!\n";
+use SPSOstrov\GetOpt\Options;
+use SPSOstrov\GetOpt\ArgsException;
+use Sterzik\ModStamp\ServerConfig;
+use Sterzik\ModStamp\Server;
+
+
+$options = new Options([
+    '6|ipv6|4|ipv4{0,1}[ipv6=@]    [6|ipv6] use ipv6 mode [4|ipv4] use ipv4 mode',
+    'p|port:                       set listening UDP port (1415 default)',
+    'l|listen:                     set listen ip',
+    'd|database:                   set modstamp database file',
+    'r|redis:                      set redis host (port may be added after a colon in form "redishost:1415")',
+    'm|max-packet-size:            set maximum UDP packet payload size (packets still may be bigger than this size if any message is longer than this limit)',
+    'b|broadcast-repeat:           repeat sending broadcast signalling packets this number of times (useful for non-reliable networks, default 1)',
+    'P|processes:                  number of server processes (use value "ncores" for number of processes corresponding to number of CPU cores)',
+    'h|help                        print help',
+    '$disabled-arguments~'
+]);
+
+$argv0 = array_shift($argv);
+$options->setArgv0($argv0);
+
+try {
+    $parsed = $options->parseArgs($argv);
+} catch (Exception $e) {
+    fprintf(STDERR, "Error: %s\n", $e->getMessage());
+    fprintf(STDERR, "use: \"%s --help\" for help\n", $argv0);
+    exit(1);
+}
+
+if ($parsed['help'] ?? false) {
+    fprintf(STDERR, $options->getHelpFormatted());
+    exit(0);
+}
+
+$ipv6Mode = null;
+$ipv6Modes = [
+    "4" => false,
+    "ipv4" => false,
+    "6" => true,
+    "ipv6" => true,
+];
+
+$parsed['ipv6'] = isset($parsed['ipv6']) ? ($ipv6Modes[$parsed['ipv6']] ?? null) : null;
+
+$processesBase = 1;
+if (isset($parsed['processes'])) {
+    if ($parsed['processes'] === 'ncores') {
+        $processesBase = null;
+        unset($parsed['processes']);
+    }
+}
+
+$integers = ["port", "max-packet-size", "broadcast-repeat", "processes"];
+foreach ($integers as $key) {
+    if (isset($parsed[$key])) {
+        if (!preg_match('/^[0-9]+$/', $parsed[$key])) {
+            fprintf(STDERR, "Error: invalid value for %s field: %s\n", "--" . $key, $parsed[$key]);
+            exit(1);
+        }
+        $parsed[$key] = (int)$parsed[$key];
+    }
+}
+
+if (isset($parsed['port'])) {
+    if ($parsed['port'] < 1 || $parsed['port'] > 65535) {
+        fprintf(STDERR, "Error: invalid port number: %s\n", $parsed['port']);
+        exit(1);
+    }
+}
+
+if (isset($parsed['max-packet-size'])) {
+    if ($parsed['max-packet-size'] < 64) {
+        fprintf(STDERR, "Error: max packet size must be at least 64 bytes\n");
+        exit(1);
+    }
+    if ($parsed['max-packet-size'] > 65535) {
+        fprintf(STDERR, "Error: max packet size must be at most 65535 bytes\n");
+        exit(1);
+    }
+}
+
+if (isset($parsed['broadcast-repeat'])) {
+    if ($parsed['broadcast-repeat'] < 1) {
+        fprintf(STDERR, "Error: broadcast repeat must be at least 1\n");
+        exit(1);
+    }
+    if ($parsed['broadcast-repeat'] > 32) {
+        fprintf(STDERR, "Error: broadcast repeat must be at most 32\n");
+        exit(1);
+    }
+}
+
+if (isset($parsed['processes'])) {
+    if ($parsed['processes'] < 1) {
+        fprintf(STDERR, "Error: number of processes must be at least 1\n");
+        exit(1);
+    }
+    if ($parsed['processes'] > 128) {
+        fprintf(STDERR, "Error: number of processes must be at most 128\n");
+        exit(1);
+    }
+}
+
+$redisHost = null;
+$redisPort = null;
+if (isset($parsed['redis'])) {
+    if (preg_match('/^(.*):([0-9]+)$/', $parsed['redis'], $matches)) {
+        $redisHost = $matches[1];
+        $redisPort = (int)$matches[2];
+        if ($redisPort < 1 || $redisPort > 65535) {
+            fprintf(STDERR, "Error: invalid redis port number: %s\n", $redisPort);
+            exit(1);
+        }
+    } else {
+        $redisHost = $parsed['redis'];
+    }
+
+    if (preg_match('/^\\[(.*)\\]$/', $redisHost, $matches)) {
+        $redisHost = $matches[1];
+    }
+    if (!filter_var($redisHost, FILTER_VALIDATE_DOMAIN) && !filter_var($redisHost, FILTER_VALIDATE_IP)) {
+        fprintf(STDERR, "Error: invalid redis host: %s\n", $redisHost);
+        exit(1);
+    }
+}
+
+$config = new ServerConfig();
+
+if (isset($parsed['ipv6'])) {
+    if ($parsed['ipv6']) {
+        $config->setIPv6();
+    } else {
+        $config->setIPv4();
+    }
+}
+
+if (isset($parsed['listen'])) {
+    $flag = FILTER_FLAG_IPV4 | ($config->isIPv6() ? FILTER_FLAG_IPV6 : 0);
+    if (!filter_var($parsed['listen'], FILTER_VALIDATE_IP, $flag)) {
+        fprintf(STDERR, "Error: invalid listen address: %s\n", $parsed['listen']);
+        exit(2);
+    }
+    $config->setListenIp($parsed['listen']);
+}
+
+if (isset($parsed['max-packet-size'])) {
+    $config->setMaxPacketSize($parsed['max-packet-size']);
+}
+
+if (isset($parsed['broadcast-repeat'])) {
+    $config->setBroadcastRepeat($parsed['broadcast-repeat']);
+}
+
+if (isset($parsed['database'])) {
+    $config->setModstampDatabaseFile($parsed['database']);
+}
+
+if (isset($parsed['processes'])) {
+    $config->setMultiProcess($parsed['processes']);
+} else {
+    $config->setMultiProcess($processesBase);
+}
+
+if ($redisHost !== null) {
+    $config->setRedisHost($redisHost);
+}
+
+if ($redisPort !== null) {
+    $config->setRedisPort($redisPort);
+}
+
+try {
+    $server = new Server($config);
+    $server->serve();
+} catch (Exception $e) {
+    fprintf(STDERR, "Error: %s\n", $e->getMessage());
+    exit(2);
+}
+

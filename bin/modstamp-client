@@ -3,4 +3,224 @@
 
 require_once dirname(__DIR__) . "/vendor/autoload.php";
 
-echo "modstamp client!\n";
+use SPSOstrov\GetOpt\Options;
+use SPSOstrov\GetOpt\ArgsException;
+use Sterzik\ModStamp\ClientConfig;
+use Sterzik\ModStamp\Client;
+use Sterzik\ModStamp\Modstamp;
+
+
+$options = new Options([
+    'listen|send{0,1}[op=@]        [listen] listen for modstamp changes [send] send modstamps',
+    '6|ipv6|4|ipv4{0,1}[ipv6=@]    [6|ipv6] use ipv6 mode [4|ipv4] use ipv4 mode',
+    'M|modstamp*                   set modstamp in form MODSTAMP=VALUE',
+    'c|connect:                    set modstamp server connection',
+    'm|max-packet-size:            set maximum UDP packet payload size (packets still may be bigger than this size if any message is longer than this limit)',
+    's|send-repeat:                repeat sending packets this number of times (useful for non-reliable networks, default 1)',
+    'r|resend-timeout:             resend packets after this timeout if no response arrives (in miliseconds)',
+    'R|request-timeout:            timeout request after this time (in miliseconds)',
+    'q|query-interval:             query interval when listening (in seconds)',
+    'v|query-interval-variance:    query interval randomization variance (in seconds)',
+    'h|help                        print help',
+    '$disabled-arguments~'
+]);
+
+$argv0 = array_shift($argv);
+$options->setArgv0($argv0);
+
+try {
+    $parsed = $options->parseArgs($argv);
+} catch (Exception $e) {
+    fprintf(STDERR, "Error: %s\n", $e->getMessage());
+    fprintf(STDERR, "use: \"%s --help\" for help\n", $argv0);
+    exit(1);
+}
+
+if ($parsed['help'] ?? false) {
+    fprintf(STDERR, $options->getHelpFormatted());
+    exit(0);
+}
+
+if (!isset($parsed['op'])) {
+    fprintf(STDERR, "Error: missing operation, use either --listen or --send flag\n");
+    exit(0);
+}
+
+$modstamps = [];
+if (isset($parsed['modstamp'])) {
+    foreach ($parsed['modstamp'] as $modstamp) {
+        $parsedModstamp = explode("=", $modstamp, 2);
+        $modstamp = $parsedModstamp[0];
+        $modstampValue = (count($parsedModstamp) > 1) ? $parsedModstamp[1] : null;
+        if ((new Modstamp($modstamp))->isValid()) {
+            $modstamps[$modstamp] = $modstampValue;
+        } else {
+            fprintf(STDERR, "Warning: modstamp '%s' is invalid, ignoring\n", $modstamp);
+        }
+    }
+}
+
+if ($parsed['op'] === 'send') {
+    foreach (array_keys($modstamps) as $modstamp) {
+        if ($modstamps[$modstamp] === null) {
+            fprintf(STDERR, "Warning: modstamp '%s' has no value, ignoring\n", $modstamp);
+            unset($modstamps[$modstamp]);
+        }
+    }
+}
+
+if (empty($modstamps)) {
+    fprintf(STDERR, "Error: no modstamp specified, specify at least one modstamp using --modstamp option\n");
+    exit (1);
+}
+
+$ipv6Mode = null;
+$ipv6Modes = [
+    "4" => false,
+    "ipv4" => false,
+    "6" => true,
+    "ipv6" => true,
+];
+
+$parsed['ipv6'] = isset($parsed['ipv6']) ? ($ipv6Modes[$parsed['ipv6']] ?? null) : null;
+
+$integers = ["max-packet-size", "send-repeat", "resend-timeout", "request-timeout", "query-interval", "query-interval-variance"];
+foreach ($integers as $key) {
+    if (isset($parsed[$key])) {
+        if (!preg_match('/^[0-9]+$/', $parsed[$key])) {
+            fprintf(STDERR, "Error: invalid value for %s field: %s\n", "--" . $key, $parsed[$key]);
+            exit(1);
+        }
+        $parsed[$key] = (int)$parsed[$key];
+    }
+}
+
+if (isset($parsed['max-packet-size'])) {
+    if ($parsed['max-packet-size'] < 64) {
+        fprintf(STDERR, "Error: max packet size must be at least 64 bytes\n");
+        exit(1);
+    }
+    if ($parsed['max-packet-size'] > 65535) {
+        fprintf(STDERR, "Error: max packet size must be at most 65535 bytes\n");
+        exit(1);
+    }
+}
+
+if (isset($parsed['send-repeat'])) {
+    if ($parsed['send-repeat'] < 1) {
+        fprintf(STDERR, "Error: send repeat must be at least 1\n");
+        exit(1);
+    }
+    if ($parsed['send-repeat'] > 32) {
+        fprintf(STDERR, "Error: send repeat must be at most 32\n");
+        exit(1);
+    }
+}
+
+if (isset($parsed['resend-timeout'])) {
+    if ($parsed['resend-timeout'] < 10) {
+        $parsed['resend-timeout'] = 10;
+        fprintf(STDERR, "Warning: resend timeout must be at least 10ms\n");
+    }
+}
+
+if (isset($parsed['request-timeout'])) {
+    if ($parsed['request-timeout'] < 100) {
+        $parsed['request-timeout'] = 100;
+        fprintf(STDERR, "Warning: request timeout must be at least 100ms\n");
+    }
+}
+
+if (isset($parsed['query-interval'])) {
+    if ($parsed['query-interval'] < 1) {
+        $parsed['query-interal'] = 1;
+        fprintf(STDERR, "Warning: query interval must be at least 1s\n");
+    }
+}
+
+$clientHost = null;
+$clientPort = null;
+if (isset($parsed['connect'])) {
+    if (preg_match('/^(.*):([0-9]+)$/', $parsed['connect'], $matches)) {
+        $clientHost = $matches[1];
+        $clientPort = (int)$matches[2];
+        if ($clientPort < 1 || $clientPort > 65535) {
+            fprintf(STDERR, "Error: invalid connect port number: %s\n", $clientPort);
+            exit(1);
+        }
+    } else {
+        $clientHost = $parsed['connect'];
+    }
+
+    if (preg_match('/^\\[(.*)\\]$/', $clientHost, $matches)) {
+        $clientHost = $matches[1];
+    }
+    if (!filter_var($clientHost, FILTER_VALIDATE_DOMAIN) && !filter_var($clientHost, FILTER_VALIDATE_IP)) {
+        fprintf(STDERR, "Error: invalid redis host: %s\n", $clientHost);
+        exit(1);
+    }
+} else {
+    fprintf(STDERR, "Error: missing server to connect, use --connect option to specify the modstamp server\n");
+    exit(1);
+}
+
+$config = new ClientConfig($clientHost);
+
+if ($clientPort !== null) {
+    $config->setPort($clientPort);
+}
+
+if (isset($parsed['ipv6'])) {
+    if ($parsed['ipv6']) {
+        $config->setIPv6();
+    } else {
+        $config->setIPv4();
+    }
+}
+
+if (isset($parsed['max-packet-size'])) {
+    $config->setMaxPacketSize($parsed['max-packet-size']);
+}
+
+if (isset($parsed['send-repeat'])) {
+    $config->setSendRepeat($parsed['send-repeat']);
+}
+
+if (isset($parsed['resend-timeout'])) {
+    $config->setResendTimeoutMs($parsed['resend-timeout']);
+}
+
+if (isset($parsed['request-timeout'])) {
+    $config->setRequestTimeoutMs($parsed['request-timeout']);
+}
+
+if (isset($parsed['query-interval'])) {
+    $config->setQueryIntervalSec($parsed['query-interval'], $parsed['query-interval'] ?? null);
+}
+
+if (isset($parsed['query-interval-variance'])) {
+    $config->setQueryIntervalSec($parsed['query-interval']);
+}
+
+try {
+    $client = new Client($config);
+    if ($parsed['op'] === 'listen') {
+        $client->listenForChange($modstamps, function ($modstamp, $value) {
+            printf("%s=%s\n", $modstamp, $value);
+        });
+    } elseif ($parsed['op'] === 'send') {
+        $confirmed = $client->sendModstamps($modstamps);
+        $ok = (count($confirmed) === count($modstamps)) ? true : false;
+        if (!$ok) {
+            fprintf(STDERR, "Warning: not all modstamps were confirmed\n");
+            exit(2);
+        }
+    } else {
+        throw new Exception(sprintf("operation %s not implemented", $parsed['op']));
+    }
+} catch (Exception $e) {
+    fprintf(STDERR, "Error: %s\n", $e->getMessage());
+    exit(2);
+}
+
+exit(0);
