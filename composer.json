@@ -1,0 +1,6 @@
+{
+    "require": {
+        "sterzik/libmodstamp": "dev-master",
+        "spsostrov/getopt": "^0.3.0"
+    }
+}
