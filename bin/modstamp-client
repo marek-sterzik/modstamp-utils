@@ -11,8 +11,6 @@ use Sterzik\ModStamp\Modstamp;
 use Sterzik\ModStamp\SecurityProfile;
 use Sterzik\ModStamp\Log;
 
-Log::setLevel(Log::DBG);
-
 $options = new Options([
     'listen|send{0,1}[op=@]        [listen] listen for modstamp changes [send] send modstamps',
     '6|ipv6|4|ipv4{0,1}[ipv6=@]    [6|ipv6] use ipv6 mode [4|ipv4] use ipv4 mode',
@@ -23,8 +21,10 @@ $options = new Options([
     'p|send-repeat:                repeat sending packets this number of times (useful for non-reliable networks, default 1)',
     'r|resend-timeout:             resend packets after this timeout if no response arrives (in miliseconds)',
     'R|request-timeout:            timeout request after this time (in miliseconds)',
-    'q|query-interval:             query interval when listening (in seconds)',
-    'v|query-interval-variance:    query interval randomization variance (in seconds)',
+    'Q|query-interval:             query interval when listening (in seconds)',
+    'V|query-interval-variance:    query interval randomization variance (in seconds)',
+    'v|verbose~{,}[@@@++]          be more verbose',
+    'q|quiet~{,}[@@@++]            be more quiet',
     'h|help                        print help',
     '$modstamp*                    set modstamps in form MODSTAMP=VALUE',
 ]);
@@ -44,6 +44,10 @@ if ($parsed['help'] ?? false) {
     fprintf(STDERR, $options->getHelpFormatted());
     exit(0);
 }
+
+$logLevelIncrease = ($parsed['verbose'] ?? 0) - ($parsed['quiet'] ?? 0);
+Log::increaseLogLevel($logLevelIncrease);
+
 
 if (!isset($parsed['op'])) {
     fprintf(STDERR, "Error: missing operation, use either --listen or --send flag\n");

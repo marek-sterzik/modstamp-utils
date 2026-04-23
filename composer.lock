@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a98e8e1f90d8f6c27cb04d2cc4c32188",
+    "content-hash": "13c2bece3aa3460031570838f3f30a74",
     "packages": [
         {
             "name": "mlocati/ip-lib",
@@ -79,16 +79,16 @@
         },
         {
             "name": "spsostrov/getopt",
-            "version": "v0.3.0",
+            "version": "v0.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/marek-sterzik/getopt.git",
-                "reference": "ad932c42b71adf67ad15ccec760920e31a1177fe"
+                "reference": "7b4e140cd40a2d95d6e55abcba02c558d401ceb5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/marek-sterzik/getopt/zipball/ad932c42b71adf67ad15ccec760920e31a1177fe",
-                "reference": "ad932c42b71adf67ad15ccec760920e31a1177fe",
+                "url": "https://api.github.com/repos/marek-sterzik/getopt/zipball/7b4e140cd40a2d95d6e55abcba02c558d401ceb5",
+                "reference": "7b4e140cd40a2d95d6e55abcba02c558d401ceb5",
                 "shasum": ""
             },
             "require": {
@@ -120,9 +120,9 @@
             "homepage": "https://github.com/marek-sterzik/getopt",
             "support": {
                 "issues": "https://github.com/marek-sterzik/getopt/issues",
-                "source": "https://github.com/marek-sterzik/getopt/tree/v0.3.0"
+                "source": "https://github.com/marek-sterzik/getopt/tree/v0.4.0"
             },
-            "time": "2024-02-09T01:44:15+00:00"
+            "time": "2026-04-23T23:18:51+00:00"
         },
         {
             "name": "sterzik/libmodstamp",
@@ -130,12 +130,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/marek-sterzik/libmodstamp.git",
-                "reference": "3df7628c1146041c3e81fb11b43c25e4b9b83950"
+                "reference": "392dbc3e6cc194bd0f17d08e742957a5db33e74f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/marek-sterzik/libmodstamp/zipball/3df7628c1146041c3e81fb11b43c25e4b9b83950",
-                "reference": "3df7628c1146041c3e81fb11b43c25e4b9b83950",
+                "url": "https://api.github.com/repos/marek-sterzik/libmodstamp/zipball/392dbc3e6cc194bd0f17d08e742957a5db33e74f",
+                "reference": "392dbc3e6cc194bd0f17d08e742957a5db33e74f",
                 "shasum": ""
             },
             "require": {
@@ -170,7 +170,7 @@
                 "issues": "https://github.com/marek-sterzik/libmodstamp/issues",
                 "source": "https://github.com/marek-sterzik/libmodstamp/tree/master"
             },
-            "time": "2026-04-23T10:38:48+00:00"
+            "time": "2026-04-23T22:04:54+00:00"
         },
         {
             "name": "symfony/deprecation-contracts",

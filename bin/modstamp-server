@@ -10,8 +10,6 @@ use Sterzik\ModStamp\Server;
 use Sterzik\ModStamp\SecurityProfile;
 use Sterzik\ModStamp\Log;
 
-Log::setLevel(Log::DBG);
-
 $options = new Options([
     '6|ipv6|4|ipv4{0,1}[ipv6=@]    [6|ipv6] use ipv6 mode [4|ipv4] use ipv4 mode',
     'p|port:                       set listening UDP port (1415 default)',
@@ -23,6 +21,8 @@ $options = new Options([
     'm|max-packet-size:            set maximum UDP packet payload size (packets still may be bigger than this size if any message is longer than this limit)',
     'b|broadcast-repeat:           repeat sending broadcast signalling packets this number of times (useful for non-reliable networks, default 1)',
     'P|processes:                  number of server processes (use value "ncores" for number of processes corresponding to number of CPU cores)',
+    'v|verbose~{,}[@@@++]          be more verbose',
+    'q|quiet~{,}[@@@++]            be more quiet',
     'h|help                        print help',
     '$disabled-arguments~'
 ]);
@@ -42,6 +42,9 @@ if ($parsed['help'] ?? false) {
     fprintf(STDERR, $options->getHelpFormatted());
     exit(0);
 }
+
+$logLevelIncrease = ($parsed['verbose'] ?? 0) - ($parsed['quiet'] ?? 0);
+Log::increaseLogLevel($logLevelIncrease);
 
 $ipv6Mode = null;
 $ipv6Modes = [
