@@ -7,7 +7,10 @@ use SPSOstrov\GetOpt\Options;
 use SPSOstrov\GetOpt\ArgsException;
 use Sterzik\ModStamp\ServerConfig;
 use Sterzik\ModStamp\Server;
+use Sterzik\ModStamp\SecurityProfile;
+use Sterzik\ModStamp\Log;
 
+Log::setLevel(Log::DBG);
 
 $options = new Options([
     '6|ipv6|4|ipv4{0,1}[ipv6=@]    [6|ipv6] use ipv6 mode [4|ipv4] use ipv4 mode',
@@ -15,6 +18,8 @@ $options = new Options([
     'l|listen:                     set listen ip',
     'd|database:                   set modstamp database file',
     'r|redis:                      set redis host (port may be added after a colon in form "redishost:1415")',
+    's|security-file               set security profile file',
+    'S|security-string             set security profile string',
     'm|max-packet-size:            set maximum UDP packet payload size (packets still may be bigger than this size if any message is longer than this limit)',
     'b|broadcast-repeat:           repeat sending broadcast signalling packets this number of times (useful for non-reliable networks, default 1)',
     'P|processes:                  number of server processes (use value "ncores" for number of processes corresponding to number of CPU cores)',
@@ -107,6 +112,22 @@ if (isset($parsed['processes'])) {
     }
 }
 
+$securityProfile = null;
+try {
+    if (isset($parsed['security-file'])) {
+        if (isset($parsed['security-string'])) {
+            fprintf(STDERR, "Error: use either --security-file or --secuirity-string, but not both\n");
+            exit(1);
+        }
+        $securityProfile = SecurityProfile::loadFromFile($parsed['secuirty-file']);
+    } elseif (isset($parsed['security-string'])) {
+        $securityProfile = SecurityProfile::loadFromString($parsed['secuirty-string']);
+    }
+} catch (Exception $e) {
+    fprintf(STDERR, "Error: cannot load security profile: %s\n", $e->getMessage());
+    exit(1);
+}
+
 $redisHost = null;
 $redisPort = null;
 if (isset($parsed['redis'])) {
@@ -173,6 +194,10 @@ if ($redisHost !== null) {
 
 if ($redisPort !== null) {
     $config->setRedisPort($redisPort);
+}
+
+if ($securityProfile !== null) {
+    $config->setSecurityProfile($securityProfile);
 }
 
 try {

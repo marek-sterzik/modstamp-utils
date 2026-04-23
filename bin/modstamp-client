@@ -8,21 +8,25 @@ use SPSOstrov\GetOpt\ArgsException;
 use Sterzik\ModStamp\ClientConfig;
 use Sterzik\ModStamp\Client;
 use Sterzik\ModStamp\Modstamp;
+use Sterzik\ModStamp\SecurityProfile;
+use Sterzik\ModStamp\Log;
 
+Log::setLevel(Log::DBG);
 
 $options = new Options([
     'listen|send{0,1}[op=@]        [listen] listen for modstamp changes [send] send modstamps',
     '6|ipv6|4|ipv4{0,1}[ipv6=@]    [6|ipv6] use ipv6 mode [4|ipv4] use ipv4 mode',
-    'M|modstamp*                   set modstamp in form MODSTAMP=VALUE',
     'c|connect:                    set modstamp server connection',
+    's|security-file               set security profile file',
+    'S|security-string             set security profile string',
     'm|max-packet-size:            set maximum UDP packet payload size (packets still may be bigger than this size if any message is longer than this limit)',
-    's|send-repeat:                repeat sending packets this number of times (useful for non-reliable networks, default 1)',
+    'p|send-repeat:                repeat sending packets this number of times (useful for non-reliable networks, default 1)',
     'r|resend-timeout:             resend packets after this timeout if no response arrives (in miliseconds)',
     'R|request-timeout:            timeout request after this time (in miliseconds)',
     'q|query-interval:             query interval when listening (in seconds)',
     'v|query-interval-variance:    query interval randomization variance (in seconds)',
     'h|help                        print help',
-    '$disabled-arguments~'
+    '$modstamp*                    set modstamps in form MODSTAMP=VALUE',
 ]);
 
 $argv0 = array_shift($argv);
@@ -70,7 +74,7 @@ if ($parsed['op'] === 'send') {
 }
 
 if (empty($modstamps)) {
-    fprintf(STDERR, "Error: no modstamp specified, specify at least one modstamp using --modstamp option\n");
+    fprintf(STDERR, "Error: no modstamp specified, specify at least one modstamp in arguments\n");
     exit (1);
 }
 
@@ -138,6 +142,22 @@ if (isset($parsed['query-interval'])) {
     }
 }
 
+$securityProfile = null;
+try {
+    if (isset($parsed['security-file'])) {
+        if (isset($parsed['security-string'])) {
+            fprintf(STDERR, "Error: use either --security-file or --secuirity-string, but not both\n");
+            exit(1);
+        }
+        $securityProfile = SecurityProfile::loadFromFile($parsed['secuirty-file']);
+    } elseif (isset($parsed['security-string'])) {
+        $securityProfile = SecurityProfile::loadFromString($parsed['secuirty-string']);
+    }
+} catch (Exception $e) {
+    fprintf(STDERR, "Error: cannot load security profile: %s\n", $e->getMessage());
+    exit(1);
+}
+
 $clientHost = null;
 $clientPort = null;
 if (isset($parsed['connect'])) {
@@ -200,6 +220,10 @@ if (isset($parsed['query-interval'])) {
 
 if (isset($parsed['query-interval-variance'])) {
     $config->setQueryIntervalSec($parsed['query-interval']);
+}
+
+if ($securityProfile !== null) {
+    $config->setSecurityProfile($securityProfile);
 }
 
 try {
