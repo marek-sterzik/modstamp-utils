@@ -119,10 +119,10 @@ $securityProfile = null;
 try {
     if (isset($parsed['security-file'])) {
         if (isset($parsed['security-string'])) {
-            fprintf(STDERR, "Error: use either --security-file or --secuirity-string, but not both\n");
+            fprintf(STDERR, "Error: use either --security-file or --security-string, but not both\n");
             exit(1);
         }
-        $securityProfile = SecurityProfile::loadFromFile($parsed['secuirty-file']);
+        $securityProfile = SecurityProfile::loadFromFile($parsed['security-file']);
     } elseif (isset($parsed['security-string'])) {
         $securityProfile = SecurityProfile::loadFromString($parsed['security-string']);
     }
