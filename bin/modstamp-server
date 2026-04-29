@@ -16,8 +16,8 @@ $options = new Options([
     'l|listen:                     set listen ip',
     'd|database:                   set modstamp database file',
     'r|redis:                      set redis host (port may be added after a colon in form "redishost:1415")',
-    's|security-file               set security profile file',
-    'S|security-string             set security profile string',
+    's|security-file:              set security profile file',
+    'S|security-string:            set security profile string',
     'm|max-packet-size:            set maximum UDP packet payload size (packets still may be bigger than this size if any message is longer than this limit)',
     'b|broadcast-repeat:           repeat sending broadcast signalling packets this number of times (useful for non-reliable networks, default 1)',
     'P|processes:                  number of server processes (use value "ncores" for number of processes corresponding to number of CPU cores)',
@@ -124,7 +124,7 @@ try {
         }
         $securityProfile = SecurityProfile::loadFromFile($parsed['secuirty-file']);
     } elseif (isset($parsed['security-string'])) {
-        $securityProfile = SecurityProfile::loadFromString($parsed['secuirty-string']);
+        $securityProfile = SecurityProfile::loadFromString($parsed['security-string']);
     }
 } catch (Exception $e) {
     fprintf(STDERR, "Error: cannot load security profile: %s\n", $e->getMessage());
