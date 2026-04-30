@@ -7,14 +7,15 @@ use SPSOstrov\GetOpt\Options;
 use SPSOstrov\GetOpt\ArgsException;
 use Sterzik\ModStamp\ClientConfig;
 use Sterzik\ModStamp\Client;
+use Sterzik\ModStamp\ClientSet;
 use Sterzik\ModStamp\Modstamp;
 use Sterzik\ModStamp\SecurityProfile;
 use Sterzik\ModStamp\Log;
 
 $options = new Options([
-    'listen|send{0,1}[op=@]        [listen] listen for modstamp changes [send] send modstamps',
+    'listen|listen-once|send{0,1}[op=@]  [listen] listen for modstamp changes [listen-once] listen for a single modstamp change and then exit [send] send modstamps',
     '6|ipv6|4|ipv4{0,1}[ipv6=@]    [6|ipv6] use ipv6 mode [4|ipv4] use ipv4 mode',
-    'c|connect:                    set modstamp server connection',
+    'c|connect*                    set modstamp server connection',
     's|security-file               set security profile file',
     'S|security-string             set security profile string',
     'm|max-packet-size:            set maximum UDP packet payload size (packets still may be bigger than this size if any message is longer than this limit)',
@@ -50,7 +51,7 @@ Log::increaseLogLevel($logLevelIncrease);
 
 
 if (!isset($parsed['op'])) {
-    fprintf(STDERR, "Error: missing operation, use either --listen or --send flag\n");
+    fprintf(STDERR, "Error: missing operation, use either --listen, --listen-once or --send flag\n");
     exit(0);
 }
 
@@ -162,60 +163,85 @@ try {
     exit(1);
 }
 
-if (!isset($parsed['connect'])) {
+if (!isset($parsed['connect']) || empty($parsed['connect'])) {
     fprintf(STDERR, "Error: missing server to connect, use --connect option to specify the modstamp server\n");
     exit(1);
 }
 
-try {
-    $config = new ClientConfig($parsed['connect']);
-} catch (Exception $e) {
-    fprintf(STDERR, "Error: %s\n", $e->getMessage());
+if (count($parsed['connect']) > 1 && $parsed['op'] !== 'send') {
+    fprintf(STDERR, "Error: cannot use multiple --connect statements for this operation\n");
     exit(1);
 }
 
-if (isset($parsed['ipv6'])) {
-    if ($parsed['ipv6']) {
-        $config->setIPv6();
-    } else {
-        $config->setIPv4();
+$clients = [];
+
+foreach ($parsed['connect'] as $connect) {
+    try {
+        $config = new ClientConfig($connect);
+    } catch (Exception $e) {
+        fprintf(STDERR, "Error: %s\n", $e->getMessage());
+        exit(1);
+    }
+
+    if (isset($parsed['ipv6'])) {
+        if ($parsed['ipv6']) {
+            $config->setIPv6();
+        } else {
+            $config->setIPv4();
+        }
+    }
+
+    if (isset($parsed['max-packet-size'])) {
+        $config->setMaxPacketSize($parsed['max-packet-size']);
+    }
+
+    if (isset($parsed['send-repeat'])) {
+        $config->setSendRepeat($parsed['send-repeat']);
+    }
+
+    if (isset($parsed['resend-timeout'])) {
+        $config->setResendTimeoutMs($parsed['resend-timeout']);
+    }
+
+    if (isset($parsed['request-timeout'])) {
+        $config->setRequestTimeoutMs($parsed['request-timeout']);
+    }
+
+    if (isset($parsed['query-interval'])) {
+        $config->setQueryIntervalSec($parsed['query-interval'], $parsed['query-interval'] ?? null);
+    }
+
+    if (isset($parsed['query-interval-variance'])) {
+        $config->setQueryIntervalSec($parsed['query-interval']);
+    }
+
+    if ($securityProfile !== null) {
+        $config->setSecurityProfile($securityProfile);
+    }
+
+    try {
+        $clients[] = new Client($config);
+    } catch (Exception $e) {
+        fprintf(STDERR, "Error: %s\n", $e->getMessage());
+        exit(2);
     }
 }
 
-if (isset($parsed['max-packet-size'])) {
-    $config->setMaxPacketSize($parsed['max-packet-size']);
-}
-
-if (isset($parsed['send-repeat'])) {
-    $config->setSendRepeat($parsed['send-repeat']);
-}
-
-if (isset($parsed['resend-timeout'])) {
-    $config->setResendTimeoutMs($parsed['resend-timeout']);
-}
-
-if (isset($parsed['request-timeout'])) {
-    $config->setRequestTimeoutMs($parsed['request-timeout']);
-}
-
-if (isset($parsed['query-interval'])) {
-    $config->setQueryIntervalSec($parsed['query-interval'], $parsed['query-interval'] ?? null);
-}
-
-if (isset($parsed['query-interval-variance'])) {
-    $config->setQueryIntervalSec($parsed['query-interval']);
-}
-
-if ($securityProfile !== null) {
-    $config->setSecurityProfile($securityProfile);
+if (count($clients) === 1) {
+    $client = array_shift($clients);
+} elseif (count($clients) > 1) {
+    $client = new ClientSet($clients);
+} else {
+    fprintf(STDERR, "Error: a bug occured in the application\n");
+    exit(2);
 }
 
 try {
-    $client = new Client($config);
-    if ($parsed['op'] === 'listen') {
+    if (in_array($parsed['op'], ['listen', 'listen-once'])) {
+        $once = ($parsed['op'] === 'listen-once') ? true : false;
         $client->listenForChange($modstamps, function ($modstamp, $value) {
             printf("%s=%s\n", $modstamp, $value);
-        });
+        }, $once);
     } elseif ($parsed['op'] === 'send') {
         $confirmed = $client->sendModstamps($modstamps);
         $ok = (count($confirmed) === count($modstamps)) ? true : false;
