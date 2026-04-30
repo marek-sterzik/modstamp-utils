@@ -130,12 +130,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/marek-sterzik/libmodstamp.git",
-                "reference": "a72c43f974002b6296da5012610abcc484a16eed"
+                "reference": "b93542285f7a7349689d61222b68eb7ca5c25a3e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/marek-sterzik/libmodstamp/zipball/a72c43f974002b6296da5012610abcc484a16eed",
-                "reference": "a72c43f974002b6296da5012610abcc484a16eed",
+                "url": "https://api.github.com/repos/marek-sterzik/libmodstamp/zipball/b93542285f7a7349689d61222b68eb7ca5c25a3e",
+                "reference": "b93542285f7a7349689d61222b68eb7ca5c25a3e",
                 "shasum": ""
             },
             "require": {
@@ -170,7 +170,7 @@
                 "issues": "https://github.com/marek-sterzik/libmodstamp/issues",
                 "source": "https://github.com/marek-sterzik/libmodstamp/tree/master"
             },
-            "time": "2026-04-30T12:54:06+00:00"
+            "time": "2026-04-30T13:38:52+00:00"
         },
         {
             "name": "symfony/deprecation-contracts",
